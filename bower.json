@@ -1,0 +1,27 @@
+{
+  "name": "amazon-cognito-identity-js",
+  "description": "Amazon Cognito Identity Provider JavaScript SDK",
+  "main": [
+    "./dist/amazon-cognito-sdk.min.js",
+    "./dist/amazon-cognito-identity.min.js",
+  ],
+  "authors": [
+    "Ionut Trestian <trestian@amazon.com>"
+  ],
+  "license": "ASL",
+  "keywords": [
+    "amazon",
+    "aws",
+    "cognito",
+    "identity"
+  ],
+  "homepage": "https://github.com/enanale/amazon-cognito-identity-js",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}
