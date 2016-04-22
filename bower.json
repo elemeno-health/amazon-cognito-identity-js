@@ -3,7 +3,7 @@
   "description": "Amazon Cognito Identity Provider JavaScript SDK",
   "main": [
     "./dist/amazon-cognito-sdk.min.js",
-    "./dist/amazon-cognito-identity.min.js",
+    "./dist/amazon-cognito-identity.min.js"
   ],
   "authors": [
     "Ionut Trestian <trestian@amazon.com>"
