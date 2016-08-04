@@ -23,9 +23,9 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
      * @constructor
      */
 
-    var AuthenticationHelper = function AuthenticationHelper(PoolName) {
+    var AuthenticationHelper = function AuthenticationHelper(PoolName, paranoia) {
         if (!(this instanceof AuthenticationHelper)) {
-       	    throw new Error('AuthenticationHelper constructor was not called with new.');
+            throw new Error('AuthenticationHelper constructor was not called with new.');
         }
 
         this.N = new BigInteger('FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1'
@@ -47,10 +47,12 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
         this.g = new BigInteger('2');
         this.k = new BigInteger(this.hexHash('00' + this.N.toString(16) + '0' + this.g.toString(16)), 16);
 
+        this.paranoia = paranoia;
+
         this.smallAValue = this.generateRandomSmallA();
         this.largeAValue = this.calculateA(this.smallAValue);
 
-        this.infoBits = sjcl.codec.utf8String.toBits('Caldera Derived Key')
+        this.infoBits = sjcl.codec.utf8String.toBits('Caldera Derived Key');
 
         this.poolName = PoolName;
     };
@@ -65,7 +67,7 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
     };
 
     /**
-     * Returns large A, a value generated from 
+     * Returns large A, a value generated from
      * @returns {BigInteger}
      */
 
@@ -80,13 +82,60 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
      */
 
     AuthenticationHelper.prototype.generateRandomSmallA = function generateRandomSmallA() {
-        var words = sjcl.random.randomWords(32 , 0);
+        var words = sjcl.random.randomWords(32 , this.paranoia);
         var hexRandom = sjcl.codec.hex.fromBits(words);
 
         var randomBigInt = new BigInteger(hexRandom, 16);
         var smallABigInt = randomBigInt.mod(this.N);
 
         return smallABigInt;
+    };
+
+    AuthenticationHelper.prototype.generateRandomString = function generateRandomString() {
+        var words = sjcl.random.randomWords(10 , this.paranoia);
+        var stringRandom = sjcl.codec.base64.fromBits(words);
+
+        return stringRandom;
+    };
+
+    AuthenticationHelper.prototype.getRandomPassword = function getRandomPassword() {
+        return this.randomPassword;
+    };
+
+    AuthenticationHelper.prototype.getSaltDevices = function getSaltDevices() {
+        return this.SaltToHashDevices;
+    };
+
+    AuthenticationHelper.prototype.getVerifierDevices = function getVerifierDevices(){
+        return this.verifierDevices;
+    };
+
+    AuthenticationHelper.prototype.generateHashDevice = function generateHashDevice(deviceGroupKey, username) {
+        this.randomPassword = this.generateRandomString();
+        var combinedString = deviceGroupKey + username + ':' + this.randomPassword;
+        var hashedString = this.hash(combinedString);
+
+        var words = sjcl.random.randomWords(4 , this.paranoia);
+        var hexRandom = sjcl.codec.hex.fromBits(words);
+        var saltDevices = new BigInteger(hexRandom, 16);
+        var firstCharSalt = saltDevices.toString(16)[0];
+        this.SaltToHashDevices = saltDevices.toString(16);
+
+        if (saltDevices.toString(16).length%2 === 1) {
+            this.SaltToHashDevices = '0' + this.SaltToHashDevices;
+        } else if ('89ABCDEFabcdef'.indexOf(firstCharSalt) !== -1) {
+            this.SaltToHashDevices = '00' + this.SaltToHashDevices;
+        }
+        var verifierDevicesNotPadded = this.g.modPow(new BigInteger(this.hexHash(this.SaltToHashDevices + hashedString), 16), this.N);
+
+        var firstCharVerifierDevices = verifierDevicesNotPadded.toString(16)[0];
+        this.verifierDevices = verifierDevicesNotPadded.toString(16);
+
+        if (verifierDevicesNotPadded.toString(16).length%2 === 1) {
+            this.verifierDevices = '0' + this.verifierDevices;
+        } else if ('89ABCDEFabcdef'.indexOf(firstCharVerifierDevices) !== -1) {
+            this.verifierDevices = '00' + this.verifierDevices;
+        }
     };
 
     /*
@@ -100,10 +149,10 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
     AuthenticationHelper.prototype.calculateA = function calculateA(a) {
         var A = this.g.modPow(a, this.N);
 
-        if (A.mod(this.N).toString() == '0') {
+        if (A.mod(this.N).toString() === '0') {
             throw new Error('Illegal paramater. A mod N cannot be 0.');
         }
-	return A;
+        return A;
     };
 
     /*
@@ -119,20 +168,20 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
         var AToHash = A.toString(16);
         var BToHash = B.toString(16);
 
-        if (A.toString(16).length%2 == 1) {
-                AToHash = '0' + AToHash;
-        } else if ('89ABCDEFabcdef'.indexOf(firstCharA) != -1) {
-                AToHash = '00' + AToHash;
+        if (A.toString(16).length%2 === 1) {
+            AToHash = '0' + AToHash;
+        } else if ('89ABCDEFabcdef'.indexOf(firstCharA) !== -1) {
+            AToHash = '00' + AToHash;
         }
 
-        if (B.toString(16).length % 2 == 1) {
-                BToHash = '0' + BToHash;
-        } else if ('89ABCDEFabcdef'.indexOf(firstCharB) != -1) {
-               	BToHash = '00' + BToHash;
+        if (B.toString(16).length % 2 === 1) {
+            BToHash = '0' + BToHash;
+        } else if ('89ABCDEFabcdef'.indexOf(firstCharB) !== -1) {
+            BToHash = '00' + BToHash;
         }
 
-	this.UHexHash = this.hexHash(AToHash + BToHash);
-        finalU = new BigInteger(this.UHexHash, 16);
+        this.UHexHash = this.hexHash(AToHash + BToHash);
+        var finalU = new BigInteger(this.UHexHash, 16);
 
         return finalU;
     };
@@ -203,14 +252,14 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
         var firstCharSalt = salt.toString(16)[0];
         var SaltToHash = salt.toString(16);
 
-        if (salt.toString(16).length%2 == 1) {
+        if (salt.toString(16).length%2 === 1) {
             SaltToHash = '0' + SaltToHash;
-        } else if ('89ABCDEFabcdef'.indexOf(firstCharSalt) != -1) {
+        } else if ('89ABCDEFabcdef'.indexOf(firstCharSalt) !== -1) {
             SaltToHash = '00' + SaltToHash;
         }
 
         var xValue = new BigInteger(this.hexHash(SaltToHash + usernamePasswordHash), 16);
-        
+
         var gModPowXN = this.g.modPow(xValue, this.N);
         var intValue2 = serverBValue.subtract(this.k.multiply(gModPowXN));
         var sValue = intValue2.modPow(this.smallAValue.add(this.UValue.multiply(xValue)), this.N).mod(this.N);
@@ -218,24 +267,24 @@ AWSCognito.CognitoIdentityServiceProvider.AuthenticationHelper = (function() {
         var SToHash = sValue.toString(16);
         var firstCharS = sValue.toString(16)[0];
 
-        if (sValue.toString(16).length%2 == 1) {
+        if (sValue.toString(16).length%2 === 1) {
             SToHash = '0' + SToHash;
-        } else if ('89ABCDEFabcdef'.indexOf(firstCharS) != -1) {
+        } else if ('89ABCDEFabcdef'.indexOf(firstCharS) !== -1) {
             SToHash = '00' + SToHash;
         }
 
         var UValueToHash = this.UHexHash;
         var firstCharU = this.UHexHash[0];
 
-        if (this.UHexHash.length%2 ==1) {
+        if (this.UHexHash.length%2 === 1) {
             UValueToHash = '0' + UValueToHash;
-        } else if (this.UHexHash.length%2 ==0 && '89ABCDEFabcdef'.indexOf(firstCharU) != -1) {
+        } else if (this.UHexHash.length%2 === 0 && '89ABCDEFabcdef'.indexOf(firstCharU) !== -1) {
             UValueToHash = '00' + UValueToHash;
         }
 
         var hkdf = this.computehkdf(sjcl.codec.hex.toBits(SToHash), sjcl.codec.hex.toBits(UValueToHash));
 
-        return hkdf; 
+        return hkdf;
     };
 
     return AuthenticationHelper;

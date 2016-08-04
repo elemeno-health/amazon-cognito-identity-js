@@ -32,13 +32,13 @@ AWSCognito.CognitoIdentityServiceProvider.CognitoUserPool = (function() {
         if (data == null || data.UserPoolId == null || data.ClientId == null) {
             throw new Error('Both user pool Id and client Id are required.');
         }
-          
+
         this.userPoolId = data.UserPoolId;
         this.clientId = data.ClientId;
+        this.paranoia = data.Paranoia || 0;
 
         this.client = new AWSCognito.CognitoIdentityServiceProvider({apiVersion: '2016-04-19'});
     };
-
 
     /**
      * Returns the user pool id
@@ -58,6 +58,23 @@ AWSCognito.CognitoIdentityServiceProvider.CognitoUserPool = (function() {
         return this.clientId;
     };
 
+    /**
+     * Returns the paranoia level
+     * @returns {int}
+     */
+
+    CognitoUserPool.prototype.getParanoia = function getParanoia() {
+        return this.paranoia;
+    };
+
+    /**
+     * sets paranoia level
+     * @param paranoia
+     */
+
+    CognitoUserPool.prototype.setParanoia = function setParanoia(paranoia) {
+        this.paranoia = paranoia;
+    };
 
     /**
      * method for signing up a user
@@ -71,8 +88,8 @@ AWSCognito.CognitoIdentityServiceProvider.CognitoUserPool = (function() {
      */
 
     CognitoUserPool.prototype.signUp = function signUp(username, password, userAttributes, validationData, callback) {
-        self = this;
-        this.client.signUp ({
+        var self = this;
+        this.client.makeUnauthenticatedRequest('signUp', {
             ClientId : self.clientId,
             Username : username,
             Password : password,
@@ -97,10 +114,10 @@ AWSCognito.CognitoIdentityServiceProvider.CognitoUserPool = (function() {
         });
     };
 
-    
+
      /**
      * method for getting the current user of the application from the local storage
-     * 
+     *
      * @returns {CognitoUser} the user retrieved from storage
      */
 
