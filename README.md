@@ -30,7 +30,7 @@ depending on your project setup and experience with modern JavaScript build tool
 
 * Install the dependencies with npm and use a bundler like webpack.
 
-## Install using seperate JavaScript files
+## Install using separate JavaScript files
 
 This method is simpler and does not require additional tools, but may have worse performance due to
 the browser having to download multiple files.
@@ -93,12 +93,12 @@ migration.
   }
   ```
 
-* Install the required tools and dependencies into your project with `npm` (Node Package Manager, which is installed
-  with Node.js): 
+* Install the Amazon Cognito Identity SDK for JavaScript and the Webpack tool into your project with `npm` (the Node
+  Package Manager, which is installed with Node.js):
 
   ```
-  > npm install --save-dev webpack exports-loader source-map-loader
-  > npm install --save amazon-cognito-identity-js aws-sdk jsbn sjcl
+  > npm install --save-dev webpack json-loader
+  > npm install --save amazon-cognito-identity-js
   ```
 
   These will add a `node_modules` directory containing these tools and dependencies into your
@@ -108,79 +108,27 @@ migration.
 
 * Create the configuration file for `webpack`, named `webpack.config.js`:
 
-  * Using the included Amazon Cognito AWS SDK for JavaScript:
-
-    ```js
-    // If you wish to use a custom build of the AWS SDK for JavaScript, put the relative path to it
-    // here, starting with `./`, eg `./vendor/my-aws-sdk-build.js`.
-    // This build must include the Cognito Identity Service Provider service.
-    var AWS_SDK_BUNDLE = 'amazon-cognito-identity-js/dist/aws-cognito-sdk.min.js';
-
-    module.exports = {
-      // Example setup for your project:
-      // The entry module that requires or imports the rest of your project.
-      // Must start with `./`!
-      entry: './src/entry',
-      // Place output files in `./dist/my-app.js`
-      output: {
-        path: 'dist',
-        filename: 'my-app.js'
-      },
-      // ... other configuration
-
-      // The current version of the AWS SDK for JavaScript does not work without extra configuration
-      // under webpack, see https://github.com/aws/aws-sdk-js/issues/603.
-      // This configuration uses the packaged output file as it is simple, see the issue for other
-      // options with different tradeoffs.
-      resolve: {
-        alias: {
-          'aws-sdk$': AWS_SDK_BUNDLE
+  ```js
+  module.exports = {
+    // Example setup for your project:
+    // The entry module that requires or imports the rest of your project.
+    // Must start with `./`!
+    entry: './src/entry',
+    // Place output files in `./dist/my-app.js`
+    output: {
+      path: 'dist',
+      filename: 'my-app.js'
+    },
+    module: {
+      loaders: [
+        {
+          test: /\.json$/,
+          loader: 'json'
         }
-      },
-      module: {
-        noParse: /aws-cognito-sdk/,
-        // Optional, but makes debugging library code much nicer:
-        preLoaders: [
-          {
-            test: /\.min\.js$/,
-            loader: 'source-map'
-          }
-        ],
-        loaders: [
-          {
-            test: require.resolve(AWS_SDK_BUNDLE),
-            loader: 'exports?AWSCognito'
-          }
-        ]
-      }
-    };
-    ```
-
-  * Or to use the full AWS SDK for JavaScript: 
-
-    ```js
-    var AWS_SDK_BUNDLE = 'aws-sdk/dist/aws-sdk.min.js';
-
-    module.exports = {
-      // ... as before.
-  
-      resolve: {
-        alias: {
-          'aws-sdk$': AWS_SDK_BUNDLE
-        }
-      },
-      module: {
-        noParse: /aws-sdk/,
-        // preLoaders: as before
-        loaders: [
-          {
-            test: require.resolve(AWS_SDK_BUNDLE),
-            loader: 'exports?AWS'
-          }
-        ]
-      }
-    };
-    ```
+      ]
+    }
+  };
+  ```
  
 * Add the following into your `package.json`
 
@@ -208,6 +156,10 @@ Account in order to access your Cognito User Pool:
 The [AWS Console for Cognito User Pools](https://console.aws.amazon.com/cognito/users/) can be used to get or create these values.
 
 If you will be using Cognito Federated Identity to provide access to your AWS resources or Cognito Sync you will also need the Id of a Cognito Identity Pool that will accept logins from the above Cognito User Pool and App, i.e. `us-east-1:85156295-afa8-482c-8933-1371f8b3b145`.
+
+## Relevant examples
+
+For an example using babel-webpack, see [babel-webpack example](https://github.com/aws/amazon-cognito-identity-js/tree/master/examples/babel-webpack).
 
 ## Usage
 
@@ -324,7 +276,7 @@ The usage examples below use the unqualified names for types in the Amazon Cogni
             console.log('access token + ' + result.getAccessToken().getJwtToken());
 
             AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-                IdentityPoolId : '...' // your identity pool id here
+                IdentityPoolId : '...', // your identity pool id here
                 Logins : {
                     // Change the key below according to the specific region your user pool is in.
                     'cognito-idp.<region>.amazonaws.com/<YOUR_USER_POOL_ID>' : result.getIdToken().getJwtToken()
@@ -461,7 +413,9 @@ you can make inputVerificationCode call a no-op
         onFailure: function(err) {
             alert(err);
         },
-        inputVerificationCode() {
+        //Optional automatic callback
+        inputVerificationCode: function(data) {
+            console.log('Code sent to: ' + data);
             var verificationCode = prompt('Please input verification code ' ,'');
             var newPassword = prompt('Enter new password ' ,'');
             cognitoUser.confirmPassword(verificationCode, newPassword, this);
@@ -514,7 +468,7 @@ you can make inputVerificationCode call a no-op
             console.log('session validity: ' + session.isValid());
 
             AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-                IdentityPoolId : '...' // your identity pool id here
+                IdentityPoolId : '...', // your identity pool id here
                 Logins : {
                     // Change the key below according to the specific region your user pool is in.
                     'cognito-idp.<region>.amazonaws.com/<YOUR_USER_POOL_ID>' : session.getIdToken().getJwtToken()
@@ -631,6 +585,36 @@ you can make inputVerificationCode call a no-op
     });
 ```
 
+**Use case 23.** Authenticate a user and set new password for a user that was created using AdminCreateUser API
+
+```javascript
+
+    cognitoUser.authenticateUser(authenticationDetails, {
+        onSuccess: function (result) {
+            // User authentication was successful
+        },
+
+        onFailure: function(err) {
+            // User authentication was not successful
+        },
+
+        mfaRequired: function(codeDeliveryDetails) {
+            // MFA is required to complete user authentication. 
+            // Get the code from user and call 
+            cognitoUser.sendMFACode(mfaCode, this)
+        },
+
+        newPasswordRequired: function(userAttributes, requiredAttributes) {
+            // User was signed up by an admin and must provide new 
+            // password and required attributes, if any, to complete 
+            // authentication.
+            
+            // Get these details and call 
+            cognitoUser.completeNewPasswordChallenge(newPassword, data, this)
+        }
+    });
+```
+
 
 ## Network Configuration
 The Amazon Cognito Identity JavaScript SDK will make requests to the following endpoints
@@ -670,15 +654,19 @@ or by calling the object method:
 ```
 
 ## Change Log
+**v1.6.0:**
+* What has changed
+  * Support for Admin create user flow. Users being signend up by admins will be able to authenticate using their one time passwords.
+  
+**v1.5.0:**
+* What has changed
+  * Changed webpack support to follow AWS-SDK usage.
 
 **v1.2.0:**
-
 * What has changed
-
   * Derived the region from the user pool id so the region doesn't need to be configured anymore.
 
 **v1.1.0:**
-
 * What has changed
    * Fixed a bug in token parsing.
    * Removed moment.js as a dependency.
@@ -687,7 +675,6 @@ or by calling the object method:
 * GA release. In this GA service launch, the following new features have been added to Amazon Cognito Your User Pools. 
 
 *  Whats new
-
    * Webpack support.
    * Support for Custom authentication flows. Developes can implement custom authentication flows around Cognito Your User Pools. See developer documentation for details.
    * Devices support in User Pools. Users can remember devices and skip MFA verification for remebered devices. 
@@ -699,7 +686,6 @@ or by calling the object method:
    * Removed dependency to sjcl bytes codec. 
 
 * What has changed
-
    * Authentication flow in Javascript SDK now uses Custom Authentication API
    * Two new exceptions added for the authentication APIs: These exceptions have been added to accurately represent the user state when the username is invalid and when the user is not confirmed. You will have to update your application to handle these exceptions.
        * UserNotFoundException: Returned when the username user does not exist.
